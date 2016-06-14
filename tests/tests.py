@@ -8,8 +8,18 @@ sys.path.append(os.path.abspath(os.path.join(
 from api import app
 
 
-def testing(url):
-	print('Testing {}'.format(url))
+TEST = 'Testing'
+GET = 'Getting'
+POST = 'Posting'
+PUT = 'Putting'
+DELETE = 'Deleting'
+
+def testing(url, verb=None):
+	if verb is None:
+		verb = TEST
+
+	print('{} {}'.format(verb, url))
+
 	return url
 
 def standard_test(res):
@@ -21,16 +31,25 @@ if __name__ == '__main__':
 	app = TestApp(app)
 
 
-	url = testing('/user/1')
-	standard_test(app.get(url))
+	url = testing('/user/register', POST)
+	res = app.post_json(url, {"email": "test@test.com",
+		"password": "password1"},
+		status=400)
+	res = app.post_json(url, {"email": "test@test.com",
+		"password": "password1",
+		"name": "Tester"})
+	res = app.post_json(url, {"email": "test@test.com",
+		"password": "password1",
+		"name": "Tester"},
+		status=409)
 
-
-	url = testing('/user/login')
+	url = testing('/user/login', POST)
 	res = app.post_json(url, {"email": "test@test.com", "password": "password1"})
 	standard_test(res)
 
 	token = res.body
 	assert len(token) > 0
+	auth = {'Authorization': 'Bearer {}'.format(token)}
 
 	app.post_json(url,
 		{"email": "wrong@nowhere.com", "password": "password"},
@@ -41,12 +60,13 @@ if __name__ == '__main__':
 		status=401)
 
 
-	url = testing('/list/new')
+	url = testing('/list/new', POST)
 	res = app.post_json(url,
 		{"title": "Test list", "description": "This is my description"},
-		headers={'Authorization': 'Bearer {}'.format(token)})
+		headers=auth)
+	added_list = res.json['id']
 	
-	url = testing('/user/1/lists')
+	url = testing('/user/1/lists', GET)
 	res = app.get(url)
 	standard_test(res)
 
@@ -54,8 +74,13 @@ if __name__ == '__main__':
 	assert len(lists) > 0
 
 
-	url = testing('/list/{}'.format(lists[0]))
-	res = app.get(url, headers={'Authorization': 'Bearer {}'.format(token)})
+	url = testing('/list/{}'.format(added_list), GET)
+	res = app.get(url, headers=auth)
+	standard_test(res)
+
+
+	url = testing('/user/1', GET)
+	res = app.get(url)
 	standard_test(res)
 
 
@@ -64,6 +89,14 @@ if __name__ == '__main__':
 	res = app.get(url, status=401)
 	res = app.get(url, headers={'Authorization': 'Bearer {}'.format(token)}, status=403)
 	'''
+
+	
+	url = testing('/list/{}'.format(added_list), DELETE)
+	res = app.delete(url, headers=auth)
+
+
+	url = testing('/user/1', DELETE)
+	res = app.delete(url, headers=auth)
 
 
 	print('All tests passed!')

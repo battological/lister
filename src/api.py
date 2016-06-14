@@ -1,4 +1,4 @@
-import bcrypt, falcon, json, re, time
+import bcrypt, falcon, json, pprint, re, time
 from datetime import datetime
 from jose import jwt
 
@@ -98,18 +98,12 @@ def validate_posted_json(req, **kwargs):
 		return j
 
 	for field, required in kwargs.iteritems():
-		if required:
-			try:
-				j[field]
-			except KeyError:
-				raise falcon.HTTPBadRequest('JSON missing {}.'.format(field),
-					'The supplied JSON did not include a "{}" field. '
-					'Please supply a "{}" field.'.format(field))
-		else:
-			try:
-				j[field]
-			except KeyError:
-				j[field] = None
+		if required and field not in j:
+			raise falcon.HTTPBadRequest('JSON missing {}.'.format(field),
+				'The supplied JSON did not include a "{}" field. '
+				'Please supply a "{}" field.'.format(field, field))
+		elif field not in j:
+			j[field] = None
 
 	return j
 
@@ -133,25 +127,9 @@ class DBConnectMiddleware(object):
 class UserRegistrationResource(object):
 
 	def on_post(self, req, res):
-		j = parse_json(req)
+		j = validate_posted_json(req, email=True, password=True, name=True)
 
-		try:
-			email = j[EMAIL]
-		except KeyError:
-			raise falcon.HTTPBadRequest('Missing email',
-				'You must supply an "email" field to register.')
-
-		try:
-			password = j[PASSWORD]
-		except KeyError:
-			raise falcon.HTTPBadRequest('Missing password',
-				'You must supply a "password" field to register.')
-
-		try:
-			name = j[NAME]
-		except KeyError:
-			raise falcon.HTTPBadRequest('Missing name',
-				'You must supply a "name" field to register.')
+		email, password, name = j[EMAIL], j[PASSWORD], j[NAME]
 
 		if not self._validate_password(password):
 			raise falcon.HTTPBadRequest('Invalid password',
@@ -248,6 +226,19 @@ class UserInfoResource(object):
 
 		res.body = json.dumps(r)
 
+	@falcon.before(authenticate)
+	def on_delete(self, req, res, userId):
+		user = self._get_user(userId)
+		user.delete_instance()
+		
+		res.status = falcon.HTTP_200
+		
+	def _get_user(self, userId):
+		user = User.select().where(User.id == userId)
+		if not user.exists():
+			raise falcon.HTTPNotFound()
+		return user.get()
+
 
 # /user/{userId}/lists
 class UserListsResource(object): 
@@ -296,7 +287,7 @@ class ListResource(object):
 
 		res.status = falcon.HTTP_200
 
-	def on_delete(self, req, res, listId):
+	def on_delete(self, req, res, listId, userId):
 		collection = self._get_collection(listId)
 		collection.delete_instance()
 		
