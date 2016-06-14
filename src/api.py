@@ -1,4 +1,5 @@
-import bcrypt, falcon, json, time
+import bcrypt, falcon, json, re, time
+from datetime import datetime
 from jose import jwt
 
 from models import User, List, Item, db
@@ -10,7 +11,11 @@ TITLE = 'title'
 DESCRIPTION = 'description'
 USER = 'user'
 NAME = 'name'
+EMAIL = 'email'
+PASSWORD = 'password'
 ID = 'id'
+PUBLIC = 'public'
+NUMBER = 'number'
 ITEM = 'item'
 LISTS = 'lists'
 USERID = 'userId'
@@ -54,8 +59,9 @@ def authenticate(req, res, resource, params):
 				.join(User)
 				.where(List.id == params[LISTID]))
 			if collection.exists():
-				owner = collection.get().owner.id
-				if str(user) != str(owner):
+				collection = collection.get()
+				owner = collection.owner.id
+				if str(user) != str(owner) and collection.public == 0:
 					forbidden()
 	except KeyError:
 		supply_valid_token()
@@ -85,21 +91,27 @@ def parse_json(req):
 			'Please supply valid JSON.')
 
 
-def read_posted_json(req):
+def validate_posted_json(req, **kwargs):
 	j = parse_json(req)
 
-	try:
-		title = j[TITLE]
-	except KeyError:
-		raise falcon.HTTPBadRequest('JSON missing "title."',
-			'The supplied JSON did not include a "title" field. '
-			'Please supply a "title" field.')
+	if kwargs is None:
+		return j
 
-	description = None
-	if DESCRIPTION in j:
-		description = j[DESCRIPTION]
-	
-	return (title, description)
+	for field, required in kwargs.iteritems():
+		if required:
+			try:
+				j[field]
+			except KeyError:
+				raise falcon.HTTPBadRequest('JSON missing {}.'.format(field),
+					'The supplied JSON did not include a "{}" field. '
+					'Please supply a "{}" field.'.format(field))
+		else:
+			try:
+				j[field]
+			except KeyError:
+				j[field] = None
+
+	return j
 
 
 ########## MIDDLEWARE ##########
@@ -117,6 +129,60 @@ class DBConnectMiddleware(object):
 
 ########## RESOURCES ##########
 
+# /user/register
+class UserRegistrationResource(object):
+
+	def on_post(self, req, res):
+		j = parse_json(req)
+
+		try:
+			email = j[EMAIL]
+		except KeyError:
+			raise falcon.HTTPBadRequest('Missing email',
+				'You must supply an "email" field to register.')
+
+		try:
+			password = j[PASSWORD]
+		except KeyError:
+			raise falcon.HTTPBadRequest('Missing password',
+				'You must supply a "password" field to register.')
+
+		try:
+			name = j[NAME]
+		except KeyError:
+			raise falcon.HTTPBadRequest('Missing name',
+				'You must supply a "name" field to register.')
+
+		if not self._validate_password(password):
+			raise falcon.HTTPBadRequest('Invalid password',
+				'Your password must be at least 8 characters '
+				'and contain at least 1 number or symbol.')
+
+		password = bcrypt.hashpw(password.encode('utf-8'),
+			bcrypt.gensalt()) # hash the password
+
+		user = User.select().where(User.email == email)
+
+		if user.exists():
+			raise falcon.HTTPConflict('Email in use',
+				'The email address you provided is already in use.')
+		else:
+			r = User(email=email,
+				password=password,
+				name=name).save()
+			if r == 0:
+				falcon.HTTPInternalServerError('Error saving user',
+					'There was an unknown error saving your '
+					'account details. Please try again later.')
+
+		res.status = falcon.HTTP_200
+			
+	def _validate_password(self, password):
+		return (
+			len(password) > 8
+			and len(re.sub('[A-Za-z]', '', password)) > 0
+		)
+
 # /user/login
 class UserResource(object):
 
@@ -130,8 +196,8 @@ class UserResource(object):
 				['Auth type="Password"'])
 
 		try:
-			email = j['email']
-			password = j['password']
+			email = j[EMAIL]
+			password = j[PASSWORD]
 		except KeyError:
 			raise falcon.HTTPUnauthorized('Invalid credentials',
 				'Your email and/or password was not sent correctly. '
@@ -167,15 +233,18 @@ class UserInfoResource(object):
 			raise falcon.HTTPNotFound()
 		user = user.get()
 
-		r = {USER: user.id, NAME: user.name, LISTS: []}
+		#r = {USER: user.id, NAME: user.name, EMAIL: user.email, LISTS: []}
+		r = {USER: user.id, NAME: user.name, EMAIL: user.email}
 
-		lists = List.select().where(List.owner == user)
+		'''
+		lists = List.select().where((List.owner == user) & (List.public == 1))
 		for l in lists:
 			r[LISTS].append({
 				ID: l.id,
 				TITLE: l.title,
 				DESCRIPTION: l.description
 			})
+		'''
 
 		res.body = json.dumps(r)
 
@@ -245,11 +314,18 @@ class ListResource(object):
 class ListCreateResource(object):
 
 	def on_post(self, req, res, userId):
-		title, description = read_posted_json(req)
+		j = validate_posted_json(req, title=True, description=False, public=False)
+
+		title = j[TITLE]
+		description = j[DESCRIPTION]
+		public = j[PUBLIC]
+		if public is None:
+			public = 0
 
 		listId = List.create(owner=userId,
 			title=title,
-			description=description).id
+			description=description,
+			public=public).id
 
 		res.body = json.dumps({ID: listId})
 
@@ -259,11 +335,24 @@ class ListCreateResource(object):
 class ListItemAddResource(object):
 
 	def on_post(self, req, res, listId, userId):
-		title, description = read_posted_json(req)
+		j = validate_posted_json(req, title=True, description=False, number=False)
+
+		title = j[TITLE]
+		description = j[DESCRIPTION]
+		number = j[NUMBER]
+
+		if number is None:
+			number = -1
+		else: # push down all the items that come after this
+			items = Item.select().where(Item.number >= number)
+			for item in items:
+				item.number += 1
+				item.save()
 
 		itemId = Item.create(collection=listId,
 			title=title,
-			description=description).id
+			description=description,
+			number=number).id
 
 		res.body = json.dumps({ID: itemId})
 
@@ -305,6 +394,7 @@ app = falcon.API(middleware=[
 ])
 
 # User interactions
+app.add_route('/user/register', UserRegistrationResource())
 app.add_route('/user/login', UserResource())
 app.add_route('/user/{userId}', UserInfoResource())
 app.add_route('/user/{userId}/lists', UserListsResource())

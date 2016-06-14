@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
 
 	url = testing('/user/login')
-	res = app.post_json(url, {"email": "test@test.com", "password": "password"})
+	res = app.post_json(url, {"email": "test@test.com", "password": "password1"})
 	standard_test(res)
 
 	token = res.body
@@ -40,6 +40,11 @@ if __name__ == '__main__':
 		{"email": "test@test.com", "password": "wrongpassword"},
 		status=401)
 
+
+	url = testing('/list/new')
+	res = app.post_json(url,
+		{"title": "Test list", "description": "This is my description"},
+		headers={'Authorization': 'Bearer {}'.format(token)})
 	
 	url = testing('/user/1/lists')
 	res = app.get(url)
