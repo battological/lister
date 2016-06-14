@@ -49,15 +49,14 @@ def authenticate(req, res, resource, params):
 		if USERID in params and user != params[USERID]:
 			forbidden()
 		elif LISTID in params:
-			owner = (List
+			collection = (List
 				.select()
 				.join(User)
-				.where(List.id == params[LISTID])
-				.get()
-				.owner
-				.id)
-			if str(user) != str(owner):
-				forbidden()
+				.where(List.id == params[LISTID]))
+			if collection.exists():
+				owner = collection.get().owner.id
+				if str(user) != str(owner):
+					forbidden()
 	except KeyError:
 		supply_valid_token()
 
@@ -269,8 +268,8 @@ class ListItemAddResource(object):
 		res.body = json.dumps({ID: itemId})
 
 
-# /list/{listId}/{itemId}
-@falcone.before(authenticate)
+# /list/{itemId}
+@falcon.before(authenticate)
 class ListItemResource(object):
 	
 	def on_put(self, req, res, listId, itemId):
@@ -293,7 +292,7 @@ class ListItemResource(object):
 		
 		res.status = falcon.HTTP_200
 
-	def _get_item(self, itemId)
+	def _get_item(self, itemId):
 		item = Item.select().where(Item.id == itemId)
 		if not item.exists():
 			raise falcon.HTTPNotFound()
@@ -316,4 +315,4 @@ app.add_route('/list/{listId}', ListResource())
 
 # Item interactions
 app.add_route('/list/{listId}/add', ListItemAddResource())
-app.add_route('/list/{listId}/{itemId}', ListItemResource())
+app.add_route('/item/{itemId}', ListItemResource())

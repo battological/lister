@@ -1,7 +1,11 @@
+import os.path
 from peewee import *
 
 
-db = SqliteDatabase('../lists.db')
+db_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
+	os.path.pardir,
+	'lists.db'))
+db = SqliteDatabase(db_path)
 
 class BaseModel(Model):
 	class Meta:
