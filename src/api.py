@@ -24,6 +24,8 @@ LISTID = 'listId'
 
 ########## UTILITY METHODS ##########
 
+#~~~~~~~~~ HOOKS ~~~~~~~~~#
+
 # Authenticate requests (for requests that require it)
 def authenticate(req, res, resource, params):
 	def supply_valid_token():
@@ -81,6 +83,15 @@ def authenticate(req, res, resource, params):
 
 	params[USERID] = user
 
+
+#~~~~~~~~~ OTHER UTILITY METHODS ~~~~~~~~~#
+
+def get_from_db(obj, objId):
+	o = obj.select().where(obj.id == objId)
+	if not o.exists():
+		raise falcon.HTTPNotFound()
+	return o.get()
+	
 
 def parse_json(req):
 	try:
@@ -206,10 +217,7 @@ class UserResource(object):
 class UserInfoResource(object):
 
 	def on_get(self, req, res, userId):
-		user = User.select().where(User.id == userId)
-		if not user.exists():
-			raise falcon.HTTPNotFound()
-		user = user.get()
+		user = get_from_db(User, userId)
 
 		#r = {USER: user.id, NAME: user.name, EMAIL: user.email, LISTS: []}
 		r = {USER: user.id, NAME: user.name, EMAIL: user.email}
@@ -228,17 +236,11 @@ class UserInfoResource(object):
 
 	@falcon.before(authenticate)
 	def on_delete(self, req, res, userId):
-		user = self._get_user(userId)
+		user = get_from_db(User, userId)
 		user.delete_instance()
 		
 		res.status = falcon.HTTP_200
 		
-	def _get_user(self, userId):
-		user = User.select().where(User.id == userId)
-		if not user.exists():
-			raise falcon.HTTPNotFound()
-		return user.get()
-
 
 # /user/{userId}/lists
 class UserListsResource(object): 
@@ -255,7 +257,7 @@ class UserListsResource(object):
 class ListResource(object):
 	
 	def on_get(self, req, res, listId, userId):
-		collection = self._get_collection(listId)
+		collection = get_from_db(List, listId)
 
 		itemList = Item.select().where(Item.collection == collection)
 
@@ -274,7 +276,7 @@ class ListResource(object):
 		})
 	
 	def on_put(self, req, res, listId):
-		collection = self._get_collection(listId)
+		collection = get_from_db(List, listId)
 
 		j = parse_json(req)
 
@@ -288,16 +290,10 @@ class ListResource(object):
 		res.status = falcon.HTTP_200
 
 	def on_delete(self, req, res, listId, userId):
-		collection = self._get_collection(listId)
+		collection = get_from_db(List, listId)
 		collection.delete_instance()
 		
 		res.status = falcon.HTTP_200
-
-	def _get_collection(self, listId):
-		collection = List.select().where(List.id == listId)
-		if not collection.exists():
-			raise falcon.HTTPNotFound()
-		return collection.get()
 
 
 # /list/new
@@ -353,7 +349,7 @@ class ListItemAddResource(object):
 class ListItemResource(object):
 	
 	def on_put(self, req, res, listId, itemId):
-		item  = self._get_item(itemId)
+		item  = get_from_db(Item, itemId)
 
 		j = parse_json(req)
 
@@ -367,16 +363,10 @@ class ListItemResource(object):
 		res.status = falcon.HTTP_200
 
 	def on_delete(self, req, res, listId, itemId):
-		item = self._get_item(itemId)
+		item = get_from_db(Item, itemId)
 		item.delete_instance()
 		
 		res.status = falcon.HTTP_200
-
-	def _get_item(self, itemId):
-		item = Item.select().where(Item.id == itemId)
-		if not item.exists():
-			raise falcon.HTTPNotFound()
-		return item.get()
 
 
 # Add routes
