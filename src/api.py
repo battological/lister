@@ -280,12 +280,14 @@ class ListResource(object):
 	def on_put(self, req, res, listId):
 		collection = get_from_db(List, listId)
 
-		j = parse_json(req)
+		j = validate_posted_json(req, title=True, description=False, public=False)
 
-		if TITLE in j:
+		if j[TITLE] is not None:
 			collection.title = j[TITLE]
-		if DESCRIPTION in j:
+		if j[DESCRIPTION] is not None:
 			collection.description = j[DESCRIPTION]
+		if j[PUBLIC] is not None:
+			collection.public = j[PUBLIC]
 
 		updated = collection.save()
 
