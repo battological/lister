@@ -20,6 +20,7 @@ ITEM = 'item'
 LISTS = 'lists'
 USERID = 'userId'
 LISTID = 'listId'
+TOKEN = 'jwt'
 
 
 ########## UTILITY METHODS ##########
@@ -156,15 +157,16 @@ class UserRegistrationResource(object):
 			raise falcon.HTTPConflict('Email in use',
 				'The email address you provided is already in use.')
 		else:
-			r = User(email=email,
-				password=password,
-				name=name).save()
-			if r == 0:
-				falcon.HTTPInternalServerError('Error saving user',
+			try:
+				userId = User.create(email=email,
+					password=password,
+					name=name).id
+			except:
+				raise falcon.HTTPInternalServerError('Error saving user',
 					'There was an unknown error saving your '
 					'account details. Please try again later.')
 
-		res.status = falcon.HTTP_200
+		res.body = json.dumps({ID: userId})
 			
 	def _validate_password(self, password):
 		return (
@@ -210,7 +212,7 @@ class UserResource(object):
 		}
 		token = jwt.encode(claims, secret, algorithm='HS256')
 
-		res.body = token
+		res.body = json.dumps({ID: user.id, TOKEN: token})
 
 
 # /user/{userId}

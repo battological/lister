@@ -32,22 +32,28 @@ if __name__ == '__main__':
 
 
 	url = testing('/user/register', POST)
+
 	res = app.post_json(url, {"email": "test@test.com",
 		"password": "password1"},
 		status=400)
+
 	res = app.post_json(url, {"email": "test@test.com",
 		"password": "password1",
 		"name": "Tester"})
+	userId = res.json['id']
+
 	res = app.post_json(url, {"email": "test@test.com",
 		"password": "password1",
 		"name": "Tester"},
 		status=409)
 
+
 	url = testing('/user/login', POST)
 	res = app.post_json(url, {"email": "test@test.com", "password": "password1"})
 	standard_test(res)
+	assert res.json['id'] == userId
 
-	token = res.body
+	token = res.json['jwt']
 	assert len(token) > 0
 	auth = {'Authorization': 'Bearer {}'.format(token)}
 
@@ -66,7 +72,7 @@ if __name__ == '__main__':
 		headers=auth)
 	added_list = res.json['id']
 	
-	url = testing('/user/1/lists', GET)
+	url = testing('/user/{}/lists'.format(userId), GET)
 	res = app.get(url)
 	standard_test(res)
 
@@ -79,7 +85,7 @@ if __name__ == '__main__':
 	standard_test(res)
 
 
-	url = testing('/user/1', GET)
+	url = testing('/user/{}'.format(userId), GET)
 	res = app.get(url)
 	standard_test(res)
 
@@ -95,7 +101,7 @@ if __name__ == '__main__':
 	res = app.delete(url, headers=auth)
 
 
-	url = testing('/user/1', DELETE)
+	url = testing('/user/{}'.format(userId), DELETE)
 	res = app.delete(url, headers=auth)
 
 
