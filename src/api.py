@@ -87,37 +87,37 @@ def authenticate(req, res, resource, params):
 
 #~~~~~~~~~ OTHER UTILITY METHODS ~~~~~~~~~#
 
-def get_from_db(obj, objId):
-	o = obj.select().where(obj.id == objId)
-	if not o.exists():
-		raise falcon.HTTPNotFound()
-	return o.get()
-	
+class BaseResource(object):
 
-def parse_json(req):
-	try:
-		return json.loads(req.stream.read())
-	except ValueError:
-		raise falcon.HTTPBadRequest('JSON decode error',
-			'The supplied JSON could not be decoded. '
-			'Please supply valid JSON.')
+	def _get_from_db(self, obj, objId):
+		o = obj.select().where(obj.id == objId)
+		if not o.exists():
+			raise falcon.HTTPNotFound()
+		return o.get()
+		
+
+	def _parse_json(self, req):
+		try:
+			return json.loads(req.stream.read())
+		except ValueError:
+			raise falcon.HTTPBadRequest('JSON decode error',
+				'The supplied JSON could not be decoded. '
+				'Please supply valid JSON.')
 
 
-def validate_posted_json(req, **kwargs):
-	j = parse_json(req)
+	def _validate_posted_json(self, req, **kwargs):
+		j = self._parse_json(req)
 
-	if kwargs is None:
+		if kwargs is not None:
+			for field, required in kwargs.iteritems():
+				if required and field not in j:
+					raise falcon.HTTPBadRequest('JSON missing {}.'.format(field),
+						'The supplied JSON did not include a "{}" field. '
+						'Please supply a "{}" field.'.format(field, field))
+				elif field not in j:
+					j[field] = None
+
 		return j
-
-	for field, required in kwargs.iteritems():
-		if required and field not in j:
-			raise falcon.HTTPBadRequest('JSON missing {}.'.format(field),
-				'The supplied JSON did not include a "{}" field. '
-				'Please supply a "{}" field.'.format(field, field))
-		elif field not in j:
-			j[field] = None
-
-	return j
 
 
 ########## MIDDLEWARE ##########
@@ -136,10 +136,10 @@ class DBConnectMiddleware(object):
 ########## RESOURCES ##########
 
 # /user/register
-class UserRegistrationResource(object):
+class UserRegistrationResource(BaseResource):
 
 	def on_post(self, req, res):
-		j = validate_posted_json(req, email=True, password=True, name=True)
+		j = self._validate_posted_json(req, email=True, password=True, name=True)
 
 		email, password, name = j[EMAIL], j[PASSWORD], j[NAME]
 
@@ -175,10 +175,10 @@ class UserRegistrationResource(object):
 		)
 
 # /user/login
-class UserResource(object):
+class UserResource(BaseResource):
 
 	def on_post(self, req, res):
-		j = parse_json(req)
+		j = self._parse_json(req)
 
 		def invalid():
 			raise falcon.HTTPUnauthorized('Invalid credentials',
@@ -216,10 +216,10 @@ class UserResource(object):
 
 
 # /user/{userId}
-class UserInfoResource(object):
+class UserInfoResource(BaseResource):
 
 	def on_get(self, req, res, userId):
-		user = get_from_db(User, userId)
+		user = self._get_from_db(User, userId)
 
 		#r = {USER: user.id, NAME: user.name, EMAIL: user.email, LISTS: []}
 		r = {USER: user.id, NAME: user.name, EMAIL: user.email}
@@ -238,14 +238,14 @@ class UserInfoResource(object):
 
 	@falcon.before(authenticate)
 	def on_delete(self, req, res, userId):
-		user = get_from_db(User, userId)
+		user = self._get_from_db(User, userId)
 		user.delete_instance()
 		
 		res.status = falcon.HTTP_200
 		
 
 # /user/{userId}/lists
-class UserListsResource(object): 
+class UserListsResource(BaseResource): 
 
 	def on_get(self, req, res, userId):
 		lists = List.select().where(List.owner == userId)
@@ -256,10 +256,10 @@ class UserListsResource(object):
 
 # /list/{listId}
 @falcon.before(authenticate)
-class ListResource(object):
+class ListResource(BaseResource):
 	
 	def on_get(self, req, res, listId, userId):
-		collection = get_from_db(List, listId)
+		collection = self._get_from_db(List, listId)
 
 		itemList = Item.select().where(Item.collection == collection)
 
@@ -278,9 +278,9 @@ class ListResource(object):
 		})
 	
 	def on_put(self, req, res, listId):
-		collection = get_from_db(List, listId)
+		collection = self._get_from_db(List, listId)
 
-		j = validate_posted_json(req, title=True, description=False, public=False)
+		j = self._validate_posted_json(req, title=True, description=False, public=False)
 
 		if j[TITLE] is not None:
 			collection.title = j[TITLE]
@@ -294,7 +294,7 @@ class ListResource(object):
 		res.status = falcon.HTTP_200
 
 	def on_delete(self, req, res, listId, userId):
-		collection = get_from_db(List, listId)
+		collection = self._get_from_db(List, listId)
 		collection.delete_instance()
 		
 		res.status = falcon.HTTP_200
@@ -302,10 +302,10 @@ class ListResource(object):
 
 # /list/new
 @falcon.before(authenticate)
-class ListCreateResource(object):
+class ListCreateResource(BaseResource):
 
 	def on_post(self, req, res, userId):
-		j = validate_posted_json(req, title=True, description=False, public=False)
+		j = self._validate_posted_json(req, title=True, description=False, public=False)
 
 		title = j[TITLE]
 		description = j[DESCRIPTION]
@@ -323,10 +323,10 @@ class ListCreateResource(object):
 
 # /list/{listId}/add
 @falcon.before(authenticate)
-class ListItemAddResource(object):
+class ListItemAddResource(BaseResource):
 
 	def on_post(self, req, res, listId, userId):
-		j = validate_posted_json(req, title=True, description=False, number=False)
+		j = self._validate_posted_json(req, title=True, description=False, number=False)
 
 		title = j[TITLE]
 		description = j[DESCRIPTION]
@@ -350,12 +350,12 @@ class ListItemAddResource(object):
 
 # /list/{itemId}
 @falcon.before(authenticate)
-class ListItemResource(object):
+class ListItemResource(BaseResource):
 	
 	def on_put(self, req, res, listId, itemId):
-		item  = get_from_db(Item, itemId)
+		item  = self._get_from_db(Item, itemId)
 
-		j = parse_json(req)
+		j = self._parse_json(req)
 
 		if TITLE in j:
 			item.title = j[TITLE]
@@ -366,8 +366,9 @@ class ListItemResource(object):
 
 		res.status = falcon.HTTP_200
 
-	def on_delete(self, req, res, listId, itemId):
-		item = get_from_db(Item, itemId)
+	# TODO: Fix numbering on delete (is this necessary?)
+	def on_delete(self, req, res, itemId):
+		item = self._get_from_db(Item, itemId)
 		item.delete_instance()
 		
 		res.status = falcon.HTTP_200
