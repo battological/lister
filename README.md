@@ -13,7 +13,8 @@ Falcon API for a simple list making app.
 | --- | ---- | --- | ---- | ------ | ----------- |
 | `/user/register` | POST | N | **email**<br>**name**<br>**password** | `{'id': userId}` | Password must be at least 8 characters and contain at least 1 number or symbol. |
 | `/user/login` | POST | N | **email**<br>**password** | `{'id': userId, 'jwt': token}` | -- |
-| `/user/{userId}` | GET | N | -- | `{'user': userId, 'name': userName, 'email': userEmail}` | -- |
+| `/user/{userId}` | GET | N | -- | `{'user': userId, 'name': userName}` | -- |
+| `/user/{userId}` | PUT | Y | email<br>name<br>password | -- | See above for values of password field. |
 | `/user/{userId}` | DELETE | Y | -- | -- | -- |
 | `/user/{userId}/lists` | GET | N | -- | `[listId1, ...]` | -- |
 

@@ -118,6 +118,10 @@ class BaseResource(object):
 					j[field] = None
 
 		return j
+	
+	def _hash_pw(self, password):
+		return bcrypt.hashpw(password.encode('utf-8'),
+			bcrypt.gensalt())
 
 
 ########## MIDDLEWARE ##########
@@ -148,8 +152,7 @@ class UserRegistrationResource(BaseResource):
 				'Your password must be at least 8 characters '
 				'and contain at least 1 number or symbol.')
 
-		password = bcrypt.hashpw(password.encode('utf-8'),
-			bcrypt.gensalt()) # hash the password
+		password = self._hash_pw(password)
 
 		user = User.select().where(User.email == email)
 
@@ -221,20 +224,25 @@ class UserInfoResource(BaseResource):
 	def on_get(self, req, res, userId):
 		user = self._get_from_db(User, userId)
 
-		#r = {USER: user.id, NAME: user.name, EMAIL: user.email, LISTS: []}
-		r = {USER: user.id, NAME: user.name, EMAIL: user.email}
-
-		'''
-		lists = List.select().where((List.owner == user) & (List.public == 1))
-		for l in lists:
-			r[LISTS].append({
-				ID: l.id,
-				TITLE: l.title,
-				DESCRIPTION: l.description
-			})
-		'''
+		r = {USER: user.id, NAME: user.name}
 
 		res.body = json.dumps(r)
+
+	@falcon.before(authenticate)
+	def on_put(self, req, res, userId):
+		user  = self._get_from_db(User, userId)
+
+		j = self._parse_json(req)
+
+		if NAME in j:
+			user.name = j[NAME]
+		if EMAIL in j:
+			user.email = j[EMAIL]
+		if PASSWORD in j:
+			user.password = self._hash_pw(j[PASSWORD])
+
+		updated = user.save()
+		
 
 	@falcon.before(authenticate)
 	def on_delete(self, req, res, userId):
@@ -360,7 +368,7 @@ class ListItemAddResource(BaseResource):
 		res.body = json.dumps({ID: itemId})
 
 
-# /list/{itemId}
+# /item/{itemId}
 @falcon.before(authenticate)
 class ListItemResource(BaseResource):
 	
