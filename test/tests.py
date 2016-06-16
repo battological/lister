@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(
 	os.path.pardir,
 	'src')))
 from api import app
-from models import User, List, Item
+from models import User
 
 
 TEST = 'Testing'
@@ -32,13 +32,14 @@ if __name__ == '__main__':
 	app = TestApp(app)
 
 
-	# Start by clearing out the app
-	for user in User.select():
+	'''
+	Start by clearing out the test data.
+	With on delete cascade turned on, this should automatically clear
+	   all testing data.
+	'''
+	user = User.select().where(User.email == 'test@test.com')
+	if user.exists():
 		user.delete_instance()
-	for lst in List.select():
-		lst.delete_instance()
-	for item in Item.select():
-		item.delete_instance()
 
 
 	url = testing('/user/register', POST)
