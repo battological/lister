@@ -27,6 +27,12 @@ def standard_test(res):
 	assert res.content_type == 'application/json'
 	assert res.content_length > 0
 
+def clear_user(email):
+	user = User.select().where(User.email == email)
+	if user.exists():
+		user.get().delete_instance()
+
+
 if __name__ == '__main__':
 
 	app = TestApp(app)
@@ -37,9 +43,8 @@ if __name__ == '__main__':
 	With on delete cascade turned on, this should automatically clear
 	   all testing data.
 	'''
-	user = User.select().where(User.email == 'test@test.com')
-	if user.exists():
-		user.delete_instance()
+	clear_user('test@test.com')
+	clear_user('alt@test.com')
 
 
 	url = testing('/user/register', POST)
@@ -58,6 +63,11 @@ if __name__ == '__main__':
 		"name": "Tester"},
 		status=409)
 
+	res = app.post_json(url, {"email": "alt@test.com",
+		"password": "password1",
+		"name": "Alt"})
+	altUserId = res.json['id']
+
 
 	url = testing('/user/login', POST)
 	res = app.post_json(url, {"email": "test@test.com", "password": "password1"})
@@ -68,8 +78,12 @@ if __name__ == '__main__':
 	assert len(token) > 0
 	auth = {'Authorization': 'Bearer {}'.format(token)}
 
+	res = app.post_json(url, {"email": "alt@test.com", "password": "password1"})
+	token = res.json['jwt']
+	altAuth = {'Authorization': 'Bearer {}'.format(token)}
+
 	app.post_json(url,
-		{"email": "wrong@nowhere.com", "password": "password"},
+		{"email": "wrong@nowhere.com", "password": "password1"},
 		status=401)
 	
 	app.post_json(url,
@@ -82,6 +96,11 @@ if __name__ == '__main__':
 		{"title": "Test list", "description": "This is my description"},
 		headers=auth)
 	added_list = res.json['id']
+
+	res = app.post_json(url,
+		{"title": "abc", "public": 1},
+		headers=auth)
+	public_list = res.json['id']
 	
 	url = testing('/user/{}/lists'.format(userId), GET)
 	res = app.get(url)
@@ -91,9 +110,18 @@ if __name__ == '__main__':
 	assert len(lists) > 0
 
 
+	url = testing('/user/{}'.format(userId), PUT)
+	res = app.put_json(url, {"name": "Test2"}, status=401)
+	res = app.put_json(url, {"name": "Test2"}, headers=altAuth, status=403)
+	res = app.put_json(url, {"name": "Test2"}, headers=auth)
+
+
 	url = testing('/list/{}'.format(added_list), GET)
 	res = app.get(url, headers=auth)
 	standard_test(res)
+
+	res = app.get(url, headers=altAuth, status=403)
+	res = app.get('/list/{}'.format(public_list), headers=altAuth)
 
 
 	url = testing('/list/{}'.format(added_list), PUT)
