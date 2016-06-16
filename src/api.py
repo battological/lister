@@ -261,15 +261,16 @@ class ListResource(BaseResource):
 	def on_get(self, req, res, listId, userId):
 		collection = self._get_from_db(List, listId)
 
-		itemList = Item.select().where(Item.collection == collection)
+		itemSel = Item.select()
+		itemOrd = (itemSel
+				.where((Item.collection == collection) & (Item.number > -1))
+				.order_by(Item.number))
+		itemUnord = (itemSel
+				.where((Item.collection == collection) & (Item.number == -1)))
 
-		items = []
-		for item in itemList:
-			items.append({
-				ITEM: item.id,
-				TITLE: item.title, 
-				DESCRIPTION: item.description
-			})
+		itemsOrd = self._make_item_list(itemOrd)
+		itemsUnord = self._make_item_list(itemUnord)
+		items = itemsOrd + itemsUnord
 
 		res.body = json.dumps({
 			TITLE: collection.title,
@@ -298,6 +299,17 @@ class ListResource(BaseResource):
 		collection.delete_instance()
 		
 		res.status = falcon.HTTP_200
+
+	def _make_item_list(self, itemIter):
+		items = []
+		for item in itemIter:
+			items.append({
+				ITEM: item.id,
+				TITLE: item.title, 
+				DESCRIPTION: item.description,
+				NUMBER: item.number
+			})
+		return items
 
 
 # /list/new
@@ -352,7 +364,7 @@ class ListItemAddResource(BaseResource):
 @falcon.before(authenticate)
 class ListItemResource(BaseResource):
 	
-	def on_put(self, req, res, listId, itemId, userId):
+	def on_put(self, req, res, itemId, userId):
 		item  = self._get_from_db(Item, itemId)
 
 		j = self._parse_json(req)
@@ -366,11 +378,18 @@ class ListItemResource(BaseResource):
 
 		res.status = falcon.HTTP_200
 
-	# TODO: Fix numbering on delete (is this necessary?)
-	def on_delete(self, req, res, itemId):
+	def on_delete(self, req, res, itemId, userId):
 		item = self._get_from_db(Item, itemId)
-		item.delete_instance()
+
+		# Fix numbering of items at lower positions
+		if item.number != -1:
+			items = Item.select().where(Item.number > item.number)
+			for it in items:
+				it.number -= 1
+				it.save()
 		
+		item.delete_instance()
+
 		res.status = falcon.HTTP_200
 
 
