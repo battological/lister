@@ -6,6 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(
 	os.path.pardir,
 	'src')))
 from api import app
+from models import User, List, Item
 
 
 TEST = 'Testing'
@@ -29,6 +30,15 @@ def standard_test(res):
 if __name__ == '__main__':
 
 	app = TestApp(app)
+
+
+	# Start by clearing out the app
+	for user in User.select():
+		user.delete_instance()
+	for lst in List.select():
+		lst.delete_instance()
+	for item in Item.select():
+		item.delete_instance()
 
 
 	url = testing('/user/register', POST)
@@ -85,6 +95,16 @@ if __name__ == '__main__':
 	standard_test(res)
 
 
+	url = testing('/list/{}'.format(added_list), PUT)
+	res = app.put_json(url, {"title": "Edited test list"}, headers=auth)
+
+	res = app.get('/list/{}'.format(added_list), headers=auth)
+	assert res.json['title'] == 'Edited test list' # should have changed
+	assert res.json['description'] == 'This is my description' # should *not* have changed
+
+	res = app.put_json(url, {"title": "Should fail"}, status=401)
+
+
 	url = testing('/user/{}'.format(userId), GET)
 	res = app.get(url)
 	standard_test(res)
@@ -97,8 +117,57 @@ if __name__ == '__main__':
 	'''
 
 	
+	url = testing('/list/{}/add'.format(added_list), POST)
+	res = app.post_json(url, 
+		{'title': 'Item2', 'description': 'Item2 desc', 'number': 2},
+		headers=auth)
+	standard_test(res)
+	res = app.post_json(url,
+		{'title': 'Item1', 'description': 'Item1 desc', 'number': 1},
+		headers=auth)
+	standard_test(res)
+	res = app.post_json(url,
+		{'title': 'Item12', 'description': 'Item12 desc', 'number': 1},
+		headers=auth)
+	itemId = res.json['id']
+	res = app.post_json(url,
+		{'title': 'Item-1', 'description': 'Item-1 desc', 'number': -1},
+		headers=auth)
+	
+	res = app.post_json(url,
+		{'title': 'Item3', 'description': 'Item3 desc', 'number': -1},
+		status=401)
+
+
+	url = testing('/list/{}'.format(added_list), GET)
+	res = app.get(url, headers=auth)
+	standard_test(res)
+	assert res.json['items'][0]['title'] == 'Item12'
+	assert res.json['items'][1]['title'] == 'Item1'
+	assert res.json['items'][2]['title'] == 'Item2'
+	assert res.json['items'][3]['title'] == 'Item-1'
+
+
+	url = testing('/item/{}'.format(itemId), DELETE)
+	app.delete(url, status=401)
+	app.delete(url, headers=auth)
+	res = app.get('/list/{}'.format(added_list), headers=auth)
+	assert res.json['items'][0]['title'] == 'Item1'
+	itemId = res.json['items'][0]['item']
+
+	
+	url = testing('/item/{}'.format(itemId), PUT)
+	app.put(url, status=401)
+	app.put_json(url, {'title': 'Item1!'}, headers=auth)
+	res = app.get('/list/{}'.format(added_list), headers=auth)
+	assert res.json['items'][0]['title'] == 'Item1!'
+
+	
 	url = testing('/list/{}'.format(added_list), DELETE)
 	res = app.delete(url, headers=auth)
+
+	# Ensure cascade delete worked
+	#app.delete('/item/{}'.format(itemId), headers=auth, status=404)
 
 
 	url = testing('/user/{}'.format(userId), DELETE)
