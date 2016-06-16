@@ -168,7 +168,7 @@ if __name__ == '__main__':
 	res = app.delete(url, headers=auth)
 
 	# Ensure cascade delete worked
-	#app.delete('/item/{}'.format(itemId), headers=auth, status=404)
+	app.delete('/item/{}'.format(itemId), headers=auth, status=404)
 
 
 	url = testing('/user/{}'.format(userId), DELETE)
