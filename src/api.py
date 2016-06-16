@@ -277,7 +277,7 @@ class ListResource(BaseResource):
 			'items': items
 		})
 	
-	def on_put(self, req, res, listId):
+	def on_put(self, req, res, listId, userId):
 		collection = self._get_from_db(List, listId)
 
 		j = self._validate_posted_json(req, title=True, description=False, public=False)
@@ -352,7 +352,7 @@ class ListItemAddResource(BaseResource):
 @falcon.before(authenticate)
 class ListItemResource(BaseResource):
 	
-	def on_put(self, req, res, listId, itemId):
+	def on_put(self, req, res, listId, itemId, userId):
 		item  = self._get_from_db(Item, itemId)
 
 		j = self._parse_json(req)
