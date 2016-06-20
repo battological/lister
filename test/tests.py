@@ -47,7 +47,7 @@ if __name__ == '__main__':
 	clear_user('alt@test.com')
 
 
-	url = testing('/user/register', POST)
+	url = testing('/api/user/register', POST)
 
 	res = app.post_json(url, {"email": "test@test.com",
 		"password": "password1"},
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 	altUserId = res.json['id']
 
 
-	url = testing('/user/login', POST)
+	url = testing('/api/user/login', POST)
 	res = app.post_json(url, {"email": "test@test.com", "password": "password1"})
 	standard_test(res)
 	assert res.json['id'] == userId
@@ -91,7 +91,7 @@ if __name__ == '__main__':
 		status=401)
 
 
-	url = testing('/list/new', POST)
+	url = testing('/api/list/new', POST)
 	res = app.post_json(url,
 		{"title": "Test list", "description": "This is my description"},
 		headers=auth)
@@ -102,7 +102,7 @@ if __name__ == '__main__':
 		headers=auth)
 	public_list = res.json['id']
 	
-	url = testing('/user/{}/lists'.format(userId), GET)
+	url = testing('/api/user/{}/lists'.format(userId), GET)
 	res = app.get(url)
 	standard_test(res)
 
@@ -110,43 +110,43 @@ if __name__ == '__main__':
 	assert len(lists) > 0
 
 
-	url = testing('/user/{}'.format(userId), PUT)
+	url = testing('/api/user/{}'.format(userId), PUT)
 	res = app.put_json(url, {"name": "Test2"}, status=401)
 	res = app.put_json(url, {"name": "Test2"}, headers=altAuth, status=403)
 	res = app.put_json(url, {"name": "Test2"}, headers=auth)
 
 
-	url = testing('/list/{}'.format(added_list), GET)
+	url = testing('/api/list/{}'.format(added_list), GET)
 	res = app.get(url, headers=auth)
 	standard_test(res)
 
 	res = app.get(url, headers=altAuth, status=403)
-	res = app.get('/list/{}'.format(public_list), headers=altAuth)
+	res = app.get('/api/list/{}'.format(public_list), headers=altAuth)
 
 
-	url = testing('/list/{}'.format(added_list), PUT)
+	url = testing('/api/list/{}'.format(added_list), PUT)
 	res = app.put_json(url, {"title": "Edited test list"}, headers=auth)
 
-	res = app.get('/list/{}'.format(added_list), headers=auth)
+	res = app.get('/api/list/{}'.format(added_list), headers=auth)
 	assert res.json['title'] == 'Edited test list' # should have changed
 	assert res.json['description'] == 'This is my description' # should *not* have changed
 
 	res = app.put_json(url, {"title": "Should fail"}, status=401)
 
 
-	url = testing('/user/{}'.format(userId), GET)
+	url = testing('/api/user/{}'.format(userId), GET)
 	res = app.get(url)
 	standard_test(res)
 
 
 	'''
-	url = testing('/list/{}'.format(str(i)))
+	url = testing('/api/list/{}'.format(str(i)))
 	res = app.get(url, status=401)
 	res = app.get(url, headers={'Authorization': 'Bearer {}'.format(token)}, status=403)
 	'''
 
 	
-	url = testing('/list/{}/add'.format(added_list), POST)
+	url = testing('/api/list/{}/add'.format(added_list), POST)
 	res = app.post_json(url, 
 		{'title': 'Item2', 'description': 'Item2 desc', 'number': 2},
 		headers=auth)
@@ -168,7 +168,7 @@ if __name__ == '__main__':
 		status=401)
 
 
-	url = testing('/list/{}'.format(added_list), GET)
+	url = testing('/api/list/{}'.format(added_list), GET)
 	res = app.get(url, headers=auth)
 	standard_test(res)
 	assert res.json['items'][0]['title'] == 'Item12'
@@ -177,29 +177,29 @@ if __name__ == '__main__':
 	assert res.json['items'][3]['title'] == 'Item-1'
 
 
-	url = testing('/item/{}'.format(itemId), DELETE)
+	url = testing('/api/item/{}'.format(itemId), DELETE)
 	app.delete(url, status=401)
 	app.delete(url, headers=auth)
-	res = app.get('/list/{}'.format(added_list), headers=auth)
+	res = app.get('/api/list/{}'.format(added_list), headers=auth)
 	assert res.json['items'][0]['title'] == 'Item1'
 	itemId = res.json['items'][0]['item']
 
 	
-	url = testing('/item/{}'.format(itemId), PUT)
+	url = testing('/api/item/{}'.format(itemId), PUT)
 	app.put(url, status=401)
 	app.put_json(url, {'title': 'Item1!'}, headers=auth)
-	res = app.get('/list/{}'.format(added_list), headers=auth)
+	res = app.get('/api/list/{}'.format(added_list), headers=auth)
 	assert res.json['items'][0]['title'] == 'Item1!'
 
 	
-	url = testing('/list/{}'.format(added_list), DELETE)
+	url = testing('/api/list/{}'.format(added_list), DELETE)
 	res = app.delete(url, headers=auth)
 
 	# Ensure cascade delete worked
-	app.delete('/item/{}'.format(itemId), headers=auth, status=404)
+	app.delete('/api/item/{}'.format(itemId), headers=auth, status=404)
 
 
-	url = testing('/user/{}'.format(userId), DELETE)
+	url = testing('/api/user/{}'.format(userId), DELETE)
 	res = app.delete(url, headers=auth)
 
 

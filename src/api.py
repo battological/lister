@@ -407,15 +407,15 @@ app = falcon.API(middleware=[
 ])
 
 # User interactions
-app.add_route('/user/register', UserRegistrationResource())
-app.add_route('/user/login', UserResource())
-app.add_route('/user/{userId}', UserInfoResource())
-app.add_route('/user/{userId}/lists', UserListsResource())
+app.add_route('/api/user/register', UserRegistrationResource())
+app.add_route('/api/user/login', UserResource())
+app.add_route('/api/user/{userId}', UserInfoResource())
+app.add_route('/api/user/{userId}/lists', UserListsResource())
 
 # List interactions
-app.add_route('/list/new', ListCreateResource())
-app.add_route('/list/{listId}', ListResource())
+app.add_route('/api/list/new', ListCreateResource())
+app.add_route('/api/list/{listId}', ListResource())
 
 # Item interactions
-app.add_route('/list/{listId}/add', ListItemAddResource())
-app.add_route('/item/{itemId}', ListItemResource())
+app.add_route('/api/list/{listId}/add', ListItemAddResource())
+app.add_route('/api/item/{itemId}', ListItemResource())
