@@ -225,7 +225,7 @@ class UserInfoResource(BaseResource):
 	def on_get(self, req, res, userId):
 		user = self._get_from_db(User, userId)
 
-		r = {USER: user.id, NAME: user.name}
+		r = {ID: user.id, NAME: user.name}
 
 		res.body = json.dumps(r)
 
@@ -282,6 +282,7 @@ class ListResource(BaseResource):
 		items = itemsOrd + itemsUnord
 
 		res.body = json.dumps({
+                        ID: collection.id,
 			TITLE: collection.title,
 			DESCRIPTION: collection.description,
 			'items': items
@@ -313,7 +314,7 @@ class ListResource(BaseResource):
 		items = []
 		for item in itemIter:
 			items.append({
-				ITEM: item.id,
+				ID: item.id,
 				TITLE: item.title, 
 				DESCRIPTION: item.description,
 				NUMBER: item.number
