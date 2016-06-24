@@ -1,5 +1,6 @@
 import bcrypt, falcon, json, pprint, re, time
 from datetime import datetime
+from falcon_cors import CORS
 from jose import jwt
 
 from models import User, List, Item, db
@@ -402,7 +403,12 @@ class ListItemResource(BaseResource):
 
 
 # Add routes
+cors = CORS(allow_all_origins=True,
+        allow_all_methods=True,
+        allow_headers_list=['Content-Type', 'Authorization'])
+
 app = falcon.API(middleware=[
+        cors.middleware,
 	DBConnectMiddleware()
 ])
 
