@@ -3,6 +3,20 @@ Lister
 
 Falcon API for a simple list making app.
 
+# Setup
+
+You will need virtualenv and pip:
+
+```
+git clone https://github.com/battological/lister.git
+cd lister
+virtualenv env
+source env/bin/activate
+pip install -r requirements.txt
+cd src
+gunicorn api:app
+```
+
 # API Specification
 
 > Note: HTTP body must be valid JSON. **bold** fields are required.
